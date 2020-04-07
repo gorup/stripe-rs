@@ -101,6 +101,17 @@ impl Client {
         self.send_blocking(self.inner.post(path))
     }
 
+    /// Make a 'POST' http request with urlencoded body and optional idempotency key
+    #[cfg(feature = "idempotency")]
+    pub fn post_form_idem<T: DeserializeOwned + Send + 'static, F: serde::Serialize>(
+        &self,
+        path: &str,
+        form: F,
+        idem: Option<&uuid::Uuid>,
+    ) -> Response<T> {
+        self.send_blocking(self.inner.post_form_idem(path, form, idem))
+    }
+
     /// Make a `POST` http request with urlencoded body
     pub fn post_form<T: DeserializeOwned + Send + 'static, F: serde::Serialize>(
         &self,

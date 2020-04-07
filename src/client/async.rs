@@ -139,11 +139,40 @@ impl Client {
         send(&self.client, req)
     }
 
+    /// Make a 'POST' http request with urlencoded body and optional idempotency key
+    #[cfg(feature = "idempotency")]
+    pub fn post_form_idem<T: DeserializeOwned + Send + 'static, F: serde::Serialize>(
+        &self,
+        path: &str,
+        form: F,
+        idem: Option<&uuid::Uuid>,
+    ) -> Response<T> {
+        let mut headers = self.headers();
+        if let Some(idemkey) = idem {
+            let val = match HeaderValue::from_str(&idemkey.to_string()) {
+                Err(e) => return Box::pin(future::ready(Err(Error::Http(crate::error::HttpError::Http(e.into()))))),
+                Ok(v) => v,
+            };
+            headers.insert(HeaderName::from_static("idempotency-key"), val);
+        }
+
+        self.post_form_with_headers(path, form, headers)
+    }
+
     /// Make a `POST` http request with urlencoded body
     pub fn post_form<T: DeserializeOwned + Send + 'static, F: serde::Serialize>(
         &self,
         path: &str,
         form: F,
+    ) -> Response<T> {
+        self.post_form_with_headers(path, form, self.headers())
+    }
+
+    fn post_form_with_headers<T: DeserializeOwned + Send + 'static, F: serde::Serialize>(
+        &self,
+        path: &str,
+        form: F,
+        mut headers: HeaderMap,
     ) -> Response<T> {
         let url = self.url(path);
         let mut req = RequestBuilder::new()
@@ -154,11 +183,12 @@ impl Client {
                 Ok(body) => hyper::Body::from(body),
             })
             .unwrap();
-        *req.headers_mut() = self.headers();
-        req.headers_mut().insert(
-            HeaderName::from_static("content-type"),
-            HeaderValue::from_str("application/x-www-form-urlencoded").unwrap(),
+        headers.insert(
+        HeaderName::from_static("content-type"),
+        HeaderValue::from_str("application/x-www-form-urlencoded").unwrap(),
         );
+        *req.headers_mut() = headers;
+
         send(&self.client, req)
     }
 

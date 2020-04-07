@@ -195,6 +195,13 @@ impl Subscription {
     }
 
     /// Creates a new subscription on an existing customer.
+    #[cfg(feature = "idempotency")]
+    pub fn create(client: &Client, params: CreateSubscription<'_>) -> Response<Subscription> {
+        client.post_form_idem("/subscriptions", &params, params.idempotency_key.as_ref())
+    }
+
+    /// Creates a new subscription on an existing customer.
+    #[cfg(not(feature = "idempotency"))]
     pub fn create(client: &Client, params: CreateSubscription<'_>) -> Response<Subscription> {
         client.post_form("/subscriptions", &params)
     }
@@ -398,6 +405,10 @@ pub struct CreateSubscription<'a> {
     /// This will always overwrite any trials that might apply via a subscribed plan.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub trial_period_days: Option<u32>,
+
+    #[cfg(feature = "idempotency")]
+    #[serde(skip_serializing)]
+    pub idempotency_key: Option<uuid::Uuid>,
 }
 
 impl<'a> CreateSubscription<'a> {
@@ -427,6 +438,8 @@ impl<'a> CreateSubscription<'a> {
             trial_end: Default::default(),
             trial_from_plan: Default::default(),
             trial_period_days: Default::default(),
+            #[cfg(feature = "idempotency")]
+            idempotency_key: Some(uuid::Uuid::new_v4()),
         }
     }
 }
